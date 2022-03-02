@@ -1,16 +1,19 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ICreateUser, ILoginUser, IUpdateUsername } from 'src/dto/User';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
 import { hash, compare } from 'bcryptjs';
+import { AuthService } from './auth.service';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @Inject()
+    private readonly authService: AuthService,
   ) {}
 
   findAll(): Promise<User[]> {
@@ -44,6 +47,7 @@ export class UsersService {
     const findByUsername = await this.usersRepository.findOne({
       where: { username },
     });
+
     const specialCharacter = `!@#$%^&*()_+{}:"<>?[];'\|,./`;
 
     const findSpecialCharacter = [...username]
@@ -55,10 +59,6 @@ export class UsersService {
         'Username cannot contain special characters',
         400,
       );
-    }
-
-    if (findById.username === username || findByUsername) {
-      throw new HttpException('Username already exists', 400);
     }
 
     if (!findById) {
