@@ -4,6 +4,7 @@ import {
   Get,
   HttpException,
   Param,
+  Patch,
   Post,
 } from '@nestjs/common';
 import { ICreateUser, IUpdateUsername } from 'src/dto/User';
@@ -30,7 +31,7 @@ export class UserController {
     return user;
   }
 
-  @Post('update/username/:id')
+  @Patch('update/username/:id')
   async updateUsername(
     @Body() { username }: Omit<IUpdateUsername, 'id'>,
     @Param() { id }: Omit<IUpdateUsername, 'username'>,
@@ -43,17 +44,6 @@ export class UserController {
       username,
       id,
     });
-
-    return user;
-  }
-
-  @Post('login')
-  async login(@Body() { email, password }: ICreateUser): Promise<User> {
-    if (!email || !password) {
-      throw new HttpException('Email and password are required', 400);
-    }
-
-    const user = await this.userService.login({ email, password });
 
     return user;
   }
