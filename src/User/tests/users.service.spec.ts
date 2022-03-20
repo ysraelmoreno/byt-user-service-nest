@@ -169,4 +169,58 @@ describe('User Service', () => {
         expect(error.message).toBe('Username already exists');
       });
   });
+
+  it('should not be able to send a username with special characters', async () => {
+    const existingUsername = {
+      id: 'e6130352-a815-11ec-b909-0242ac120002',
+      name: 'John Doe',
+      username: null,
+      email: 'johndoe@gmail.com',
+      password: '123456',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await jest
+      .spyOn(repositoryMock, 'findOne')
+      .mockImplementation(async (conditions: Record<string, any>) => {
+        if (conditions.where.username) {
+          return null;
+        }
+
+        return existingUsername;
+      });
+
+    await userService
+      .updateUsername({
+        id: 'e6130352-a815-11ec-b909-0242ac120002',
+        username: '@johndoe',
+      })
+      .catch((error) => {
+        expect(error.message).toBe(
+          'Username cannot contain special characters',
+        );
+      });
+  });
+
+  it('should be not able to update username of an unexisting user', async () => {
+    await jest
+      .spyOn(repositoryMock, 'findOne')
+      .mockImplementation(async (conditions: Record<string, any>) => {
+        if (conditions.where.username) {
+          return null;
+        }
+
+        return null;
+      });
+
+    await userService
+      .updateUsername({
+        id: 'e6130352-a815-11ec-b909-0242ac120002',
+        username: 'johndoe',
+      })
+      .catch((error) => {
+        expect(error.message).toBe('User not found');
+      });
+  });
 });
