@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   HttpException,
   Param,
   Patch,
@@ -16,6 +17,7 @@ export class UserController {
   constructor(private readonly userService: UsersService) {}
 
   @Get()
+  @HttpCode(200)
   async getUsers(): Promise<User[]> {
     return this.userService.findAll();
   }
@@ -32,6 +34,7 @@ export class UserController {
   }
 
   @Patch('update/username/:id')
+  @HttpCode(200)
   async updateUsername(
     @Body() { username }: Omit<IUpdateUsername, 'id'>,
     @Param() { id }: Omit<IUpdateUsername, 'username'>,

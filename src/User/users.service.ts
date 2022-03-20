@@ -13,8 +13,16 @@ export class UsersService {
     private usersRepository: Repository<User>,
   ) {}
 
-  findAll(): Promise<User[]> {
-    return this.usersRepository.find();
+  async findAll(): Promise<User[]> {
+    const users = await this.usersRepository.find();
+
+    const usersFormatted = users.map((user) => {
+      delete user.password;
+
+      return user;
+    });
+
+    return usersFormatted;
   }
 
   async createUser(user: ICreateUser): Promise<User> {
@@ -40,7 +48,6 @@ export class UsersService {
   }
 
   async updateUsername({ username, id }: IUpdateUsername): Promise<User> {
-    const findById = await this.usersRepository.findOne({ where: { id } });
     const findByUsername = await this.usersRepository.findOne({
       where: { username },
     });
@@ -52,7 +59,7 @@ export class UsersService {
       .filter((letter) => letter === true);
 
     if (findByUsername) {
-      throw new HttpException('Username already exists', 4000);
+      throw new HttpException('Username already exists', 400);
     }
 
     if (findSpecialCharacter.length > 0) {
@@ -62,13 +69,15 @@ export class UsersService {
       );
     }
 
+    const findById = await this.usersRepository.findOne({ where: { id } });
+
     if (!findById) {
       throw new HttpException('User not found', 400);
     }
 
-    const updatedUser = await this.usersRepository.save({
-      username,
-    });
+    findById.username = username;
+
+    const updatedUser = await this.usersRepository.save(findById);
 
     return updatedUser;
   }
