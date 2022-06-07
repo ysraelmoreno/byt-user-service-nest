@@ -4,7 +4,9 @@ import {
   PrimaryGeneratedColumn,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToMany,
 } from 'typeorm';
+import { Session } from './session.entity';
 
 @Entity('users')
 export class User {
@@ -22,6 +24,10 @@ export class User {
   @Column()
   password: string;
 
+  @Column()
+  salt: string;
+
+  @OneToMany(() => Session, (session: Session) => session.user)
   @Column({
     nullable: true,
   })

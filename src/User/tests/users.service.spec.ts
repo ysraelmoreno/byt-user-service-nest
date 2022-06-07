@@ -3,7 +3,9 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../user.entity';
 import { UsersService } from '../users.service';
-import { uuid } from 'uuidv4';
+import { v4 } from 'uuid';
+
+import { hash } from 'bcryptjs';
 
 describe('User Service', () => {
   let userService: UsersService;
@@ -31,7 +33,7 @@ describe('User Service', () => {
   it('Should be able to list all users', async () => {
     const users = [
       {
-        id: uuid(),
+        id: v4(),
         name: 'John Doe',
         email: 'johndoe@gmail.com',
         password: '123456',
@@ -49,7 +51,7 @@ describe('User Service', () => {
 
   it('should not be able to create a user that already exists', async () => {
     const user = {
-      id: uuid(),
+      id: v4(),
       name: 'John Doe',
       email: 'johndoe@gmail.com',
       password: '123456',
@@ -74,7 +76,7 @@ describe('User Service', () => {
 
   it("should be able to identify if a user it's already created", async () => {
     const user = {
-      id: uuid(),
+      id: v4(),
       name: 'John Doe',
       email: 'johndoe@gmail.com',
       password: '123456',
@@ -204,15 +206,9 @@ describe('User Service', () => {
   });
 
   it('should be not able to update username of an unexisting user', async () => {
-    await jest
-      .spyOn(repositoryMock, 'findOne')
-      .mockImplementation(async (conditions: Record<string, any>) => {
-        if (conditions.where.username) {
-          return null;
-        }
-
-        return null;
-      });
+    await jest.spyOn(repositoryMock, 'findOne').mockImplementation(async () => {
+      return null;
+    });
 
     await userService
       .updateUsername({
@@ -221,6 +217,66 @@ describe('User Service', () => {
       })
       .catch((error) => {
         expect(error.message).toBe('User not found');
+      });
+  });
+
+  it('should be able to login a user', async () => {
+    const existingUsername = {
+      id: 'e6130352-a815-11ec-b909-0242ac120002',
+      name: 'John Doe',
+      username: null,
+      email: 'johndoe@gmail.com',
+      password: await hash('123456', 12),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await jest.spyOn(repositoryMock, 'findOne').mockImplementation(async () => {
+      return existingUsername;
+    });
+
+    expect(
+      await userService.login({
+        email: 'johndoe@gmail.com',
+        password: '123456',
+      }),
+    ).toBe(existingUsername);
+  });
+
+  it('should not be able to login an unexisting user', async () => {
+    await jest.spyOn(repositoryMock, 'findOne').mockImplementation(async () => {
+      return null;
+    });
+
+    await userService
+      .login({
+        email: 'johndoeAsdax@gmail.com',
+        password: 'johndoe@1234',
+      })
+      .catch((error) => {
+        expect(error.message).toBe('User not found');
+      });
+  });
+
+  it('should not be able to login an user with wrong credentials', async () => {
+    const existingUsername = {
+      id: 'e6130352-a815-11ec-b909-0242ac120002',
+      name: 'John Doe',
+      username: null,
+      email: 'johndoe@gmail.com',
+      password: await hash('123456', 12),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    await jest.spyOn(repositoryMock, 'findOne').mockImplementation(async () => {
+      return existingUsername;
+    });
+
+    await userService
+      .login({ email: 'johndoe@gmail.com', password: '123' })
+      .catch((error) => {
+        expect(error.message).toBe('Invalid credentials');
       });
   });
 });

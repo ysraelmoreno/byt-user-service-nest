@@ -1,16 +1,25 @@
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ICreateUser, ILoginUser, IUpdateUsername } from 'src/dto/User';
+import {
+  ICreateUser,
+  ILoginUser,
+  ILoginUserResponse,
+  IUpdateUsername,
+} from 'src/dto/User';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 
-import { hash, compare } from 'bcryptjs';
-
+import { HashService } from 'src/Hash/hash.service';
+import { SessionService } from './session.service';
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
+    @Inject('HashService')
+    private hashService: HashService,
+    @Inject('SessionService')
+    private sessionService: SessionService,
   ) {}
 
   async findAll(): Promise<User[]> {
@@ -28,21 +37,23 @@ export class UsersService {
   async createUser(user: ICreateUser): Promise<User> {
     const { email, name, password } = user;
 
-    const findByEmail = await this.usersRepository.findOne({
-      where: { email },
-    });
+    const findByEmail = await this.findByEmail(email);
 
     if (findByEmail) {
       throw new HttpException('User already exists', 400);
     }
 
-    const hashedPassword = await hash(password, 12);
+    const [salt, hashedPassword] = await this.hashService.hash(password);
 
     const newUser = await this.usersRepository.save({
       email,
       name,
       password: hashedPassword,
+      salt,
     });
+
+    delete newUser.password;
+    delete newUser.salt;
 
     return newUser;
   }
@@ -52,7 +63,7 @@ export class UsersService {
       where: { username },
     });
 
-    const specialCharacter = `!@#$%^&*()_+{}:"<>?[];'\|,./`;
+    const specialCharacter = `!@#$%^&*()+{}:"<>?[];'\|,./`;
 
     const findSpecialCharacter = [...username]
       .map((letter) => !!specialCharacter.match(letter))
@@ -79,25 +90,66 @@ export class UsersService {
 
     const updatedUser = await this.usersRepository.save(findById);
 
+    delete updatedUser.password;
+    delete updatedUser.salt;
+
     return updatedUser;
   }
 
-  async login({ email, password }: ILoginUser): Promise<User> {
-    const findUserByEmail = await this.usersRepository.findOne({
-      where: { email },
-    });
+  async getUserData(id: string): Promise<User> {
+    if (!id) {
+      throw new HttpException('Id is required', 400);
+    }
+
+    const user = await this.usersRepository.findOne({ where: { id } });
+
+    delete user.password;
+    delete user.salt;
+
+    return user;
+  }
+
+  async authenticate({
+    email,
+    password,
+  }: ILoginUser): Promise<ILoginUserResponse> {
+    const findUserByEmail = await this.findByEmail(email);
 
     if (!findUserByEmail) {
-      throw new HttpException('User not found', 400);
+      throw new HttpException('Invalid credentials', 400);
     }
 
-    const validPassword = await compare(password, findUserByEmail.password);
+    const isPasswordValid = await this.hashService.compare(
+      password,
+      findUserByEmail.password,
+      {
+        salt: findUserByEmail.salt,
+      },
+    );
 
-    if (!validPassword) {
-      throw new HttpException('Invalid password', 400);
+    if (!isPasswordValid) {
+      throw new HttpException('Invalid credentials', 400);
     }
 
-    return findUserByEmail;
+    const token = await this.hashService.generateToken({
+      id: findUserByEmail.id,
+      email: findUserByEmail.email,
+      username: findUserByEmail.username,
+      name: findUserByEmail.name,
+    });
+
+    await this.sessionService.create({
+      token,
+      userId: findUserByEmail.id,
+    });
+
+    delete findUserByEmail.password;
+    delete findUserByEmail.salt;
+
+    return {
+      user: findUserByEmail,
+      token,
+    };
   }
 
   async findByEmail(email: string): Promise<User> {
