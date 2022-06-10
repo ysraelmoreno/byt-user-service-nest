@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
+import { scryptSync, randomBytes, timingSafeEqual, createHmac } from 'crypto';
 
 import { sign, verify } from 'jsonwebtoken';
 import auth from 'src/config/auth';
@@ -21,20 +21,58 @@ export class HashService {
     return [salt, hashedData];
   }
 
-  async generateToken(info: any, options?: any): Promise<string> {
-    const token: string = await sign({ ...info }, auth.jwt.secret, {
-      ...options,
-      expiresIn: auth.jwt.expiresIn,
-      algorithm: 'HS512',
-    });
+  async decode(token: string) {
+    const splitToken = token.split('.');
 
-    return token;
+    const payload = JSON.parse(
+      Buffer.from(splitToken[1], 'base64url').toString(),
+    );
+
+    const signatureToBeCompared = createHmac('SHA256', auth.jwt.secret)
+      .update(`${splitToken[0]}.${splitToken[1]}.${auth.jwt.secret}`)
+      .digest('hex');
+
+    const isNotManipulated = timingSafeEqual(
+      Buffer.from(signatureToBeCompared),
+      Buffer.from(splitToken[2]),
+    );
+
+    if (isNotManipulated) {
+      return false;
+    } else {
+      return payload;
+    }
+  }
+
+  async generateToken(info: any): Promise<string> {
+    const hmac = createHmac('SHA256', auth.jwt.secret);
+
+    const tokenHeader = Buffer.from(
+      JSON.stringify({
+        alg: 'SHA256',
+        typ: 'JWT',
+      }),
+    ).toString('base64url');
+
+    const tokenPayload = Buffer.from(
+      JSON.stringify({
+        ...info,
+        iat: new Date().getTime(),
+        exp: new Date().getTime() + auth.jwt.expiresIn,
+      }),
+    ).toString('base64url');
+
+    const tokenSignature = hmac
+      .update(`${tokenHeader}.${tokenPayload}.${auth.jwt.secret}`)
+      .digest('hex');
+
+    return `${tokenHeader}.${tokenPayload}.${tokenSignature}`;
   }
 
   async decryptToken(token: string) {
     try {
       const decoded = await verify(token, auth.jwt.secret, {
-        algorithms: ['HS512'],
+        algorithms: ['SHA256'],
       });
 
       return decoded;
@@ -44,15 +82,15 @@ export class HashService {
   }
 
   async compare(
-    password: string,
-    databasePassword: string,
+    comparedData: string,
+    dataToBeCompared: string,
     { salt }: ICompareOptions,
   ) {
-    const hashedBuffer = scryptSync(password, salt, 64);
+    const hashedBuffer = scryptSync(comparedData, salt, 64);
 
-    const passwordBuffer = Buffer.from(databasePassword, 'hex');
+    const dataBuffer = Buffer.from(dataToBeCompared, 'hex');
 
-    const match = timingSafeEqual(hashedBuffer, passwordBuffer);
+    const match = timingSafeEqual(hashedBuffer, dataBuffer);
 
     return match;
   }

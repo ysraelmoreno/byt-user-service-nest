@@ -1,4 +1,4 @@
-import { HttpException, Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 
 import { Repository } from 'typeorm';
@@ -11,12 +11,6 @@ export class SessionService {
     @InjectRepository(Session)
     private sessionRepository: Repository<Session>,
   ) {}
-
-  async findAll(): Promise<Session[]> {
-    const users = await this.sessionRepository.find();
-
-    return users;
-  }
 
   async create(session: { userId: string; token: string }): Promise<Session> {
     const findSession = await this.sessionRepository.find({

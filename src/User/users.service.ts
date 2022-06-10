@@ -115,8 +115,8 @@ export class UsersService {
   }: ILoginUser): Promise<ILoginUserResponse> {
     const findUserByEmail = await this.findByEmail(email);
 
-    if (!findUserByEmail) {
-      throw new HttpException('Invalid credentials', 400);
+    if (!findUserByEmail.id) {
+      throw new HttpException('Invalid credentials', 401);
     }
 
     const isPasswordValid = await this.hashService.compare(
@@ -128,7 +128,7 @@ export class UsersService {
     );
 
     if (!isPasswordValid) {
-      throw new HttpException('Invalid credentials', 400);
+      throw new HttpException('Invalid credentials', 401);
     }
 
     const token = await this.hashService.generateToken({
@@ -137,6 +137,8 @@ export class UsersService {
       username: findUserByEmail.username,
       name: findUserByEmail.name,
     });
+
+    await this.hashService.decode(token);
 
     await this.sessionService.create({
       token,

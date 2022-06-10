@@ -40,7 +40,7 @@ export class UserController {
   async getUserData(@Req() request: Request): Promise<User> {
     const [, token] = request.headers.authorization.split(' ');
 
-    const { id } = await this.hashService.decryptToken(token);
+    const { id } = await this.hashService.decode(token);
 
     if (!id) {
       throw new HttpException('Id is required', 400);
@@ -64,7 +64,8 @@ export class UserController {
       const user = await this.userService.authenticate({ email, password });
 
       return user;
-    } catch {
+    } catch (err) {
+      console.log(err);
       throw new HttpException('Invalid credentials', 401);
     }
   }
