@@ -12,7 +12,7 @@ export class AuthMiddleware implements NestMiddleware {
 
       try {
         verify(token, auth.jwt.secret, {
-          algorithms: ['HS512'],
+          algorithms: ['HS256'],
         });
 
         return next();

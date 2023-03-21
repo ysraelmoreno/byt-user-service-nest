@@ -138,7 +138,9 @@ export class UsersService {
       name: findUserByEmail.name,
     });
 
-    await this.hashService.decode(token);
+    console.log(token);
+
+    await this.hashService.decryptToken(token);
 
     await this.sessionService.create({
       token,
